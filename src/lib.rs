@@ -9,7 +9,7 @@ use std::string::String;
 use std::str::StrExt;
 use std::path::AsPath;
 use std::error::FromError;
-use std::io::{Read, BufReader};
+use std::io::{Read, BufReader, Write};
 use std::vec::Vec;
 use std::num::ParseIntError;
 use std::mem;
@@ -44,7 +44,7 @@ impl DataType {
     fn from_str(s: &str) -> Result<DataType, Error> {
         match s {
             "float_le" => Ok(DataType::FloatLE),
-            "xdr_float" => Ok(DataType::XDRFloat),
+//            "xdr_float" => Ok(DataType::XDRFloat),
             _ => Err(Error::DataType)
         }
     }
@@ -72,31 +72,25 @@ pub struct AVSFile<'a> {
 }
 
 impl<'a> AVSFile<'a> {
-    pub fn read_f32(self: &mut Self) -> Result<f32, Error> {
-        match self.data_type {
-            DataType::XDRFloat => {
-                let mut buf = [ 0u8; 4 ];
-                let mut read : usize = 0;
-                loop {
-                    read += try!(self.reader.read(&mut buf[read .. 4]));
-                    if read == 4 { break; }
-                }
-                (&mut buf).reverse();
-                Ok(unsafe { mem::transmute(buf) } )
-            }
-            DataType::FloatLE => {
-                let mut buf = [ 0u8; 4 ];
-                let mut read : usize = 0;
-                loop {
-                    read += try!(self.reader.read(&mut buf[read .. 4]));
-                    if read == 4 { break; }
-                }
-                Ok(unsafe { mem::transmute(buf) } )
-            }
+    pub fn write<W: Write, T>(
+                writer: &mut W, ndim: usize, dims: &[usize], data: &[T]) 
+                    -> Result<(), Error> {
+        // header
+        try!(writer.write_fmt(format_args!("# AVS FLD file (written by avsfldrs github.com/greyhill/avsfldrs)\n")));
+        try!(writer.write_fmt(format_args!("ndim={}\n", ndim)));
+        try!(writer.write_fmt(format_args!("veclen=1\n")));
+        try!(writer.write_fmt(format_args!("nspace={}\n", ndim)));
+        try!(writer.write_fmt(format_args!("field=uniform\n")));
+        try!(writer.write_fmt(format_args!("data=float_le\n"))); // TODO
+        for (id, size) in dims.iter().enumerate() {
+            try!(writer.write_fmt(format_args!("dim{}={}\n", id+1, size)));
         }
+        try!(writer.write_fmt(format_args!("{}{}", 12 as char, 12 as char)));
+        try!(writer.write_all(unsafe { mem::transmute(data) }));
+        Err(Error::IO)
     }
 
-    pub fn read_all<T>(self: &mut Self) -> Result<Box<[T]>, Error> {
+    pub fn read<T>(self: &mut Self) -> Result<Box<[T]>, Error> {
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(mem::size_of::<T>()*size);
         try!(self.reader.read_to_end(&mut buf_u8));
