@@ -1,192 +1,182 @@
 #![feature(io)]
-use std::io::{Read,Error};
+#![feature(path)]
+#![feature(fs)]
+#![feature(collections)]
+#![feature(core)]
 
+use std::fs::{File};
 use std::string::String;
 use std::str::StrExt;
+use std::path::AsPath;
+use std::error::FromError;
+use std::io::{Read, BufReader};
+use std::vec::Vec;
+use std::num::ParseIntError;
+use std::mem;
 
-enum DataType {
-    UNDEFINED,
-    FLOATLE,
+pub enum Error {
+    IOError,
+    ParseError,
+    DataTypeError,
+    FieldTypeError,
+    MalformedError,
+    NotImplemented
 }
 
-enum FieldType {
-    UNDEFINED,
-    UNIFORM,
+impl FromError<std::io::Error> for Error {
+    fn from_error(_: std::io::Error) -> Error {
+        Error::IOError
+    }
 }
 
-pub struct FLDArray<'a> {
-    ndim: usize,
-    sizes: Vec<usize>,
-    data_type: DataType,
-    field_type: FieldType,
+impl FromError<ParseIntError> for Error {
+    fn from_error(_: ParseIntError) -> Error {
+        Error::ParseError
+    }
+}
+
+pub enum DataType {
+    XDRFloat,
+    FloatLE,
+}
+
+impl DataType {
+    fn from_str(s: &str) -> Result<DataType, Error> {
+        match s {
+            "float_le" => Ok(DataType::FloatLE),
+            "xdr_float" => Ok(DataType::XDRFloat),
+            _ => Err(Error::DataTypeError)
+        }
+    }
+}
+
+pub enum FieldType {
+    Uniform
+}
+
+impl FieldType {
+    fn from_str(s: &str) -> Result<FieldType, Error> {
+        match s {
+            "uniform" => Ok(FieldType::Uniform),
+            _ => Err(Error::FieldTypeError)
+        }
+    }
+}
+
+pub struct AVSFile<'a> {
+    pub ndim: usize,
+    pub sizes: Vec<usize>,
+    pub data_type: DataType,
+    pub field_type: FieldType,
     reader: Box<Read + 'a>
 }
 
-impl<'a> FLDArray<'a> {
-}
+impl<'a> AVSFile<'a> {
+    pub fn read_f32(self: &mut Self) -> Result<f32, Error> {
+        match self.data_type {
+            DataType::XDRFloat => {
+                let mut buf = [ 0u8; 4 ];
+                assert!(try!(self.reader.read(&mut buf)) == 4);
+                (&mut buf).reverse();
+                Ok(unsafe { mem::transmute(buf) } )
+            }
+            DataType::FloatLE => {
+                let mut buf = [ 0u8; 4 ];
+                assert!(try!(self.reader.read(&mut buf)) == 4);
+                Ok(unsafe { mem::transmute(buf) } )
+            }
+        }
+    }
 
-pub fn read<'a, T: Read + 'a>(mut f: T) -> Result<FLDArray<'a>, Error> {
-    // stuff
-    let mut ndim: usize = -1;
-    let mut sizes = Vec::<usize>::new();
-    let mut data_type = DataType::UNDEFINED;
-    let mut field_type = FieldType::UNDEFINED;
+    pub fn open<P: AsPath>(path: &P) -> Result<AVSFile, Error> {
+        let mut reader = BufReader::new(try!(File::open(path)));
 
-    // read header
-    let mut line = String::new();
-    let mut last_char: u8 = 0;
-    let mut extern_path_str = String::new();
-    loop {
-        let mut char_buf: [u8; 1] = [ 0u8 ];
+        let mut ndim: Option<usize> = None;
+        let mut sizes = Vec::<Option<usize>>::new();
+        let mut data_type: Option<DataType> = None;
+        let mut field_type: Option<FieldType> = None;
+        let mut external: Option<String> = None;
 
-        match f.read(&mut char_buf) {
-            Ok(_) => {},
-            Err(e) => return Err(e)
-        };
-        let c = char_buf[0];
+        let mut line = String::new();
+        let mut last_char: u8 = 0;
+        loop {
+            let mut new_char_buf: [u8;1] = [ 0u8 ];
+            try!(reader.read(&mut new_char_buf));
 
-        match (last_char, char_buf[0]) {
-            (12, 12) => {
-                // two form-feed characters for end of header
-                break
-            },
-            (_, 10) => { 
-                // parse line
-                {
-                    let words: Vec<&str> = line
-                        .split('=')
-                        .map(|s| s.trim())
-                        .collect();
-                    match &words[] {
-                        ["ndim", ndim_str] => {
-                            match (ndim_str.parse().ok(), ndim) {
-                                (Some(i), -1) => {
-                                    ndim = i;
-                                    for _ in 0..ndim {
-                                        sizes.push(0);
-                                    }
-                                }
-                                (None, _) | (Some(_), _) => {
-                                    panic!("ndim already set?");
-                                }
-                            };
-                        },
-                        ["dim1", dim1_str] => {
-                            match (dim1_str.parse().ok(), ndim) {
-                                (_, -1) => {
-                                    panic!("ndim not set yet?");
-                                }
-                                (Some(i), _) => {
-                                    sizes[0] = i;
-                                }
-                                (None, _) => { 
-                                    panic!("dimension parse error");
-                                }
-                            }
-                        },
-                        ["dim2", dim2_str] => {
-                            match (dim2_str.parse().ok(), ndim) {
-                                (_, -1) => {
-                                    panic!("ndim not set yet?");
-                                }
-                                (Some(i), _) => {
-                                    sizes[1] = i;
-                                }
-                                (None, _) => {
-                                    panic!("dimension parse error");
-                                }
-                            }
-                        },
-                        ["dim3", dim3_str] => {
-                            match (dim3_str.parse().ok(), ndim) {
-                                (_, -1) => {
-                                    panic!("ndim not set yet?");
-                                }
-                                (Some(i), _) => {
-                                    sizes[2] = i;
-                                }
-                                (None, _) => {
-                                    panic!("dimension parse error");
-                                }
-                            }
-                        },
-                        ["dim4", dim4_str] => {
-                            match (dim4_str.parse().ok(), ndim) {
-                                (_, -1) => {
-                                    panic!("ndim not set yet?");
-                                }
-                                (Some(i), _) => {
-                                    sizes[3] = i;
-                                }
-                                (None, _) => {
-                                    panic!("dimension parse error");
-                                }
-                            }
-                        },
-                        ["data", data_str] => {
-                            data_type = 
-                                match data_str {
-                                    "float_le" => DataType::FLOATLE,
-                                    _ => DataType::UNDEFINED
-                                };
-                        },
-                        ["field", field_str] => {
-                            field_type = 
-                                match field_str {
-                                    "uniform" => FieldType::UNIFORM,
-                                    _ => FieldType::UNDEFINED
-                                };
+            // break on two chr 14s
+            let new_char = new_char_buf[0];
+            if (new_char, last_char) == (14u8, 14u8) {
+                break;
+            }
+            last_char = new_char;
+
+            line.push(new_char as char);
+
+            // new line; process the line and discard
+            if new_char == 10 {
+                let tokens: Vec<&str> = line.split('=')
+                    .map(|s| s.trim()).collect();
+                match &tokens[] {
+                    ["ndim", s] => {
+                        let nd = try!(s.parse::<usize>());
+                        ndim = Some(nd);
+                        for _ in 0..nd {
+                            sizes.push(None);
                         }
-                        ["variable 1 file", path] => {
-                            extern_path_str = path.to_string();
-                        }
-                        _ => {
-                            println!("unhandled FLD header: {}", line);
-                        }
-                    }
+                    },
+                    ["dim1", s] => sizes[0] = Some(try!(s.parse::<usize>())),
+                    ["dim2", s] => sizes[1] = Some(try!(s.parse::<usize>())),
+                    ["dim3", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["dim4", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["dim5", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["dim6", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["dim7", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["data", s] => 
+                        data_type = Some(try!(DataType::from_str(s))),
+                    ["field", s] => 
+                        field_type = Some(try!(FieldType::from_str(s))),
+                    ["variable 1 file", s] => 
+                        external = Some(String::from_str(s)),
+                    _ => {}
                 }
-            
-                // new line
+            }
+            // hack?  code smell?  need borrow in previous block to expire
+            if new_char == 10 {
                 line.clear();
             }
-            (_, _) => { 
-                // add character to line
-                line.push(c as char);
-            }
-        };
-        last_char = char_buf[0];
-    }
+        }
 
-    // ensure field and data types are set
-    match data_type {
-        DataType::UNDEFINED => panic!("unknown data type"),
-        _ => {}
+        match external {
+            None => {
+                let mut tr = AVSFile { 
+                    ndim: try!(ndim.ok_or(Error::MalformedError)),
+                    sizes: Vec::<usize>::new(),
+                    data_type: try!(data_type.ok_or(Error::MalformedError)),
+                    field_type: try!(field_type.ok_or(Error::MalformedError)),
+                    reader: Box::new(reader),
+                };
+                for idx in 0..ndim.unwrap() {
+                    tr.sizes.push(
+                        try!(sizes[idx].ok_or(Error::MalformedError)));
+                }
+                Ok(tr)
+            },
+            Some(path) => {
+                let new_reader = BufReader::new(try!(File::open(&path)));
+                let mut tr = AVSFile { 
+                    ndim: try!(ndim.ok_or(Error::MalformedError)),
+                    sizes: Vec::<usize>::new(),
+                    data_type: try!(data_type.ok_or(Error::MalformedError)),
+                    field_type: try!(field_type.ok_or(Error::MalformedError)),
+                    reader: Box::new(new_reader),
+                };
+                for idx in 0..ndim.unwrap() {
+                    tr.sizes.push(
+                        try!(sizes[idx].ok_or(Error::MalformedError)));
+                }
+                Ok(tr)
+            },
+        }
     }
-    match field_type {
-        FieldType::UNDEFINED => panic!("unknown field type"),
-        _ => {}
-    }
-
-    let mut tr: FLDArray<'a>;
-    if extern_path_str == ""  {
-        tr = FLDArray { 
-            ndim: ndim,
-            sizes: sizes,
-            data_type: data_type,
-            field_type: field_type,
-            reader: Box::<T>::new(f)
-        };
-    } else {
-        tr = FLDArray {
-            ndim: ndim,
-            sizes: sizes,
-            data_type: data_type,
-            field_type: field_type,
-            reader: Box::<T>::new(f)
-        };
-        panic!("only one-file FLDs supported");
-    }
-
-    Ok(tr)
 }
 
