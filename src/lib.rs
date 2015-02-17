@@ -15,23 +15,23 @@ use std::num::ParseIntError;
 use std::mem;
 
 pub enum Error {
-    IOError,
-    ParseError,
-    DataTypeError,
-    FieldTypeError,
-    MalformedError,
+    IO,
+    Parse,
+    DataType,
+    FieldType,
+    Malformed,
     NotImplemented
 }
 
 impl FromError<std::io::Error> for Error {
     fn from_error(_: std::io::Error) -> Error {
-        Error::IOError
+        Error::IO
     }
 }
 
 impl FromError<ParseIntError> for Error {
     fn from_error(_: ParseIntError) -> Error {
-        Error::ParseError
+        Error::Parse
     }
 }
 
@@ -45,7 +45,7 @@ impl DataType {
         match s {
             "float_le" => Ok(DataType::FloatLE),
             "xdr_float" => Ok(DataType::XDRFloat),
-            _ => Err(Error::DataTypeError)
+            _ => Err(Error::DataType)
         }
     }
 }
@@ -58,7 +58,7 @@ impl FieldType {
     fn from_str(s: &str) -> Result<FieldType, Error> {
         match s {
             "uniform" => Ok(FieldType::Uniform),
-            _ => Err(Error::FieldTypeError)
+            _ => Err(Error::FieldType)
         }
     }
 }
@@ -76,16 +76,32 @@ impl<'a> AVSFile<'a> {
         match self.data_type {
             DataType::XDRFloat => {
                 let mut buf = [ 0u8; 4 ];
-                assert!(try!(self.reader.read(&mut buf)) == 4);
+                let mut read : usize = 0;
+                loop {
+                    read += try!(self.reader.read(&mut buf[read .. 4]));
+                    if read == 4 { break; }
+                }
                 (&mut buf).reverse();
                 Ok(unsafe { mem::transmute(buf) } )
             }
             DataType::FloatLE => {
                 let mut buf = [ 0u8; 4 ];
-                assert!(try!(self.reader.read(&mut buf)) == 4);
+                let mut read : usize = 0;
+                loop {
+                    read += try!(self.reader.read(&mut buf[read .. 4]));
+                    if read == 4 { break; }
+                }
                 Ok(unsafe { mem::transmute(buf) } )
             }
         }
+    }
+
+    pub fn read_all<T>(self: &mut Self) -> Result<Box<[T]>, Error> {
+        let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
+        let mut buf_u8 = Vec::<u8>::with_capacity(mem::size_of::<T>()*size);
+        try!(self.reader.read_to_end(&mut buf_u8));
+        let buf: Vec<T> = unsafe { mem::transmute(buf_u8) };
+        Ok(buf.into_boxed_slice())
     }
 
     pub fn open<P: AsPath>(path: &P) -> Result<AVSFile, Error> {
@@ -105,7 +121,7 @@ impl<'a> AVSFile<'a> {
 
             // break on two chr 14s
             let new_char = new_char_buf[0];
-            if (new_char, last_char) == (14u8, 14u8) {
+            if (new_char, last_char) == (12u8, 12u8) {
                 break;
             }
             last_char = new_char;
@@ -149,30 +165,30 @@ impl<'a> AVSFile<'a> {
         match external {
             None => {
                 let mut tr = AVSFile { 
-                    ndim: try!(ndim.ok_or(Error::MalformedError)),
+                    ndim: try!(ndim.ok_or(Error::Malformed)),
                     sizes: Vec::<usize>::new(),
-                    data_type: try!(data_type.ok_or(Error::MalformedError)),
-                    field_type: try!(field_type.ok_or(Error::MalformedError)),
+                    data_type: try!(data_type.ok_or(Error::Malformed)),
+                    field_type: try!(field_type.ok_or(Error::Malformed)),
                     reader: Box::new(reader),
                 };
                 for idx in 0..ndim.unwrap() {
                     tr.sizes.push(
-                        try!(sizes[idx].ok_or(Error::MalformedError)));
+                        try!(sizes[idx].ok_or(Error::Malformed)));
                 }
                 Ok(tr)
             },
             Some(path) => {
                 let new_reader = BufReader::new(try!(File::open(&path)));
                 let mut tr = AVSFile { 
-                    ndim: try!(ndim.ok_or(Error::MalformedError)),
+                    ndim: try!(ndim.ok_or(Error::Malformed)),
                     sizes: Vec::<usize>::new(),
-                    data_type: try!(data_type.ok_or(Error::MalformedError)),
-                    field_type: try!(field_type.ok_or(Error::MalformedError)),
+                    data_type: try!(data_type.ok_or(Error::Malformed)),
+                    field_type: try!(field_type.ok_or(Error::Malformed)),
                     reader: Box::new(new_reader),
                 };
                 for idx in 0..ndim.unwrap() {
                     tr.sizes.push(
-                        try!(sizes[idx].ok_or(Error::MalformedError)));
+                        try!(sizes[idx].ok_or(Error::Malformed)));
                 }
                 Ok(tr)
             },
