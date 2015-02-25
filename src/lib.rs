@@ -126,7 +126,7 @@ impl<'a> AVSFile<'a> {
             if new_char == 10 {
                 let tokens: Vec<&str> = line.split('=')
                     .map(|s| s.trim()).collect();
-                match &tokens[] {
+                match &tokens[..] {
                     ["ndim", s] => {
                         let nd = try!(s.parse::<usize>());
                         ndim = Some(nd);
