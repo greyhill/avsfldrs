@@ -86,7 +86,11 @@ impl<'a> AVSFile<'a> {
             try!(writer.write_fmt(format_args!("dim{}={}\n", id+1, size)));
         }
         try!(writer.write_fmt(format_args!("{}{}", 12 as char, 12 as char)));
-        try!(writer.write_all(unsafe { mem::transmute(data) }));
+        let b: &[u8] = unsafe {
+            std::slice::from_raw_parts(data.as_ptr() as *const u8, 
+                                       data.len()*mem::size_of::<T>())
+        };
+        try!(writer.write_all(b));
         Ok(())
     }
 
