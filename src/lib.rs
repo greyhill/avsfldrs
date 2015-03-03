@@ -87,7 +87,7 @@ impl<'a> AVSFile<'a> {
         }
         try!(writer.write_fmt(format_args!("{}{}", 12 as char, 12 as char)));
         try!(writer.write_all(unsafe { mem::transmute(data) }));
-        Err(Error::IO)
+        Ok(())
     }
 
     pub fn read<T>(self: &mut Self) -> Result<Box<[T]>, Error> {
