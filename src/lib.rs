@@ -101,7 +101,15 @@ impl<'a> AVSFile<'a> {
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(mem::size_of::<T>()*size);
         try!(self.reader.read_to_end(&mut buf_u8));
-        let buf: Vec<T> = unsafe { mem::transmute(buf_u8) };
+        let buf: Vec<T> = unsafe {
+            let ptr = buf_u8.as_mut_ptr();
+            let cap = buf_u8.capacity();
+            mem::forget(buf_u8);
+            Vec::<T>::from_raw_parts(
+                mem::transmute(ptr),
+                size,
+                cap / mem::size_of::<T>())
+        };
         Ok(buf)
     }
 
