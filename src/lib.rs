@@ -14,6 +14,7 @@ use std::vec::Vec;
 use std::num::ParseIntError;
 use std::mem;
 
+#[derive(Debug)]
 pub enum Error {
     IO,
     Parse,
@@ -35,6 +36,7 @@ impl FromError<ParseIntError> for Error {
     }
 }
 
+#[derive(Debug)]
 pub enum DataType {
     XDRFloat,
     FloatLE,
@@ -50,6 +52,7 @@ impl DataType {
     }
 }
 
+#[derive(Debug)]
 pub enum FieldType {
     Uniform
 }
@@ -94,12 +97,12 @@ impl<'a> AVSFile<'a> {
         Ok(())
     }
 
-    pub fn read<T>(self: &mut Self) -> Result<Box<[T]>, Error> {
+    pub fn read<T>(self: &mut Self) -> Result<Vec<T>, Error> {
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(mem::size_of::<T>()*size);
         try!(self.reader.read_to_end(&mut buf_u8));
         let buf: Vec<T> = unsafe { mem::transmute(buf_u8) };
-        Ok(buf.into_boxed_slice())
+        Ok(buf)
     }
 
     pub fn open<P: AsPath>(path: &P) -> Result<AVSFile, Error> {
