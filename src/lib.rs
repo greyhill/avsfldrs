@@ -152,10 +152,10 @@ impl<'a> AVSFile<'a> {
                     ["dim1", s] => sizes[0] = Some(try!(s.parse::<usize>())),
                     ["dim2", s] => sizes[1] = Some(try!(s.parse::<usize>())),
                     ["dim3", s] => sizes[2] = Some(try!(s.parse::<usize>())),
-                    ["dim4", s] => sizes[2] = Some(try!(s.parse::<usize>())),
-                    ["dim5", s] => sizes[2] = Some(try!(s.parse::<usize>())),
-                    ["dim6", s] => sizes[2] = Some(try!(s.parse::<usize>())),
-                    ["dim7", s] => sizes[2] = Some(try!(s.parse::<usize>())),
+                    ["dim4", s] => sizes[3] = Some(try!(s.parse::<usize>())),
+                    ["dim5", s] => sizes[4] = Some(try!(s.parse::<usize>())),
+                    ["dim6", s] => sizes[5] = Some(try!(s.parse::<usize>())),
+                    ["dim7", s] => sizes[6] = Some(try!(s.parse::<usize>())),
                     ["data", s] => 
                         data_type = Some(try!(DataType::from_str(s))),
                     ["field", s] => 
