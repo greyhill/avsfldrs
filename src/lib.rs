@@ -76,9 +76,10 @@ pub struct AVSFile<'a> {
 
 impl<'a> AVSFile<'a> {
     pub fn write<W: Write, T>(
-                writer: &mut W, ndim: usize, dims: &[usize], data: &[T]) 
+                writer: &mut W, dims: &[usize], data: &[T]) 
                     -> Result<(), Error> {
         // header
+        let ndim = dims.len();
         try!(writer.write_fmt(format_args!("# AVS FLD file (written by avsfldrs github.com/greyhill/avsfldrs)\n")));
         try!(writer.write_fmt(format_args!("ndim={}\n", ndim)));
         try!(writer.write_fmt(format_args!("veclen=1\n")));
