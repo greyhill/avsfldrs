@@ -6,7 +6,6 @@
 
 use std::fs::{File};
 use std::string::String;
-use std::str::StrExt;
 use std::path::AsPath;
 use std::error::FromError;
 use std::io::{Read, BufReader, Write};
