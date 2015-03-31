@@ -1,12 +1,9 @@
-#![feature(io)]
-#![feature(path)]
-#![feature(fs)]
 #![feature(collections)]
-#![feature(core)]
+#![feature(slice_patterns)]
 
 use std::fs::{File};
 use std::string::String;
-use std::path::AsPath;
+use std::path::Path;
 use std::error::FromError;
 use std::io::{Read, BufReader, Write};
 use std::vec::Vec;
@@ -65,15 +62,15 @@ impl FieldType {
     }
 }
 
-pub struct AVSFile<'a> {
+pub struct AVSFile {
     pub ndim: usize,
     pub sizes: Vec<usize>,
     pub data_type: DataType,
     pub field_type: FieldType,
-    reader: Box<Read + 'a>
+    reader: Box<Read>
 }
 
-impl<'a> AVSFile<'a> {
+impl AVSFile {
     pub fn write<W: Write, T>(
                 writer: &mut W, dims: &[usize], data: &[T]) 
                     -> Result<(), Error> {
@@ -113,7 +110,7 @@ impl<'a> AVSFile<'a> {
         Ok(buf)
     }
 
-    pub fn open<P: AsPath>(path: &P) -> Result<AVSFile, Error> {
+    pub fn open(path: &Path) -> Result<AVSFile, Error> {
         let mut reader = BufReader::new(try!(File::open(path)));
 
         let mut ndim: Option<usize> = None;
