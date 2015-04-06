@@ -1,10 +1,7 @@
-#![feature(collections)]
-#![feature(slice_patterns)]
-
 use std::fs::{File};
 use std::string::String;
 use std::path::Path;
-use std::error::FromError;
+use std::convert::From;
 use std::io::{Read, BufReader, Write};
 use std::vec::Vec;
 use std::num::ParseIntError;
@@ -20,14 +17,14 @@ pub enum Error {
     NotImplemented
 }
 
-impl FromError<std::io::Error> for Error {
-    fn from_error(_: std::io::Error) -> Error {
+impl From<std::io::Error> for Error {
+    fn from(_: std::io::Error) -> Error {
         Error::IO
     }
 }
 
-impl FromError<ParseIntError> for Error {
-    fn from_error(_: ParseIntError) -> Error {
+impl From<ParseIntError> for Error {
+    fn from(_: ParseIntError) -> Error {
         Error::Parse
     }
 }
@@ -138,27 +135,27 @@ impl AVSFile {
             if new_char == 10 {
                 let tokens: Vec<&str> = line.split('=')
                     .map(|s| s.trim()).collect();
-                match &tokens[..] {
-                    ["ndim", s] => {
-                        let nd = try!(s.parse::<usize>());
+                match tokens[0] {
+                    "ndim" => {
+                        let nd = try!(tokens[1].parse::<usize>());
                         ndim = Some(nd);
                         for _ in 0..nd {
                             sizes.push(None);
                         }
                     },
-                    ["dim1", s] => sizes[0] = Some(try!(s.parse::<usize>())),
-                    ["dim2", s] => sizes[1] = Some(try!(s.parse::<usize>())),
-                    ["dim3", s] => sizes[2] = Some(try!(s.parse::<usize>())),
-                    ["dim4", s] => sizes[3] = Some(try!(s.parse::<usize>())),
-                    ["dim5", s] => sizes[4] = Some(try!(s.parse::<usize>())),
-                    ["dim6", s] => sizes[5] = Some(try!(s.parse::<usize>())),
-                    ["dim7", s] => sizes[6] = Some(try!(s.parse::<usize>())),
-                    ["data", s] => 
-                        data_type = Some(try!(DataType::from_str(s))),
-                    ["field", s] => 
-                        field_type = Some(try!(FieldType::from_str(s))),
-                    ["variable 1 file", s] => 
-                        external = Some(String::from_str(s)),
+                    "dim1" => sizes[0] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim2" => sizes[1] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim3" => sizes[2] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim4" => sizes[3] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim5" => sizes[4] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim6" => sizes[5] = Some(try!(tokens[1].parse::<usize>())),
+                    "dim7" => sizes[6] = Some(try!(tokens[1].parse::<usize>())),
+                    "data" => 
+                        data_type = Some(try!(DataType::from_str(tokens[1]))),
+                    "field" => 
+                        field_type = Some(try!(FieldType::from_str(tokens[1]))),
+                    "variable 1 file" => 
+                        external = Some(tokens[1].to_string()),
                     _ => {}
                 }
             }
