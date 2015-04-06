@@ -1,7 +1,7 @@
 use std::fs::{File};
 use std::string::String;
 use std::path::Path;
-use std::convert::From;
+use std::convert::{From, AsRef};
 use std::io::{Read, BufReader, Write};
 use std::vec::Vec;
 use std::num::ParseIntError;
@@ -107,7 +107,8 @@ impl AVSFile {
         Ok(buf)
     }
 
-    pub fn open(path: &Path) -> Result<AVSFile, Error> {
+    pub fn open<P: AsRef<Path>>(p: &P) -> Result<AVSFile, Error> {
+        let path = p.as_ref();
         let mut reader = BufReader::new(try!(File::open(path)));
 
         let mut ndim: Option<usize> = None;
