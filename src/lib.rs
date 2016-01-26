@@ -125,7 +125,6 @@ impl AVSFile {
         try!(self.reader.read_to_end(&mut buf_u8));
 
         for n in 0 .. size {
-            println!("converting {}", n);
             let off0 = n*self.data_type.num_bytes();
             let off1 = (n+1)*self.data_type.num_bytes();
             buf_tr.push(self.data_type.convert_to_f32(&buf_u8[off0 .. off1]));
