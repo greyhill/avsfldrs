@@ -118,12 +118,14 @@ impl AVSFile {
     }
 
     pub fn read_to_f32(self: &mut Self) -> Result<Vec<f32>, Error> {
+        println!("{:?}", self.sizes);
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(size * self.data_type.num_bytes());
         let mut buf_tr = Vec::<f32>::with_capacity(size);
         try!(self.reader.read_to_end(&mut buf_u8));
 
         for n in 0 .. size {
+            println!("converting {}", n);
             let off0 = n*self.data_type.num_bytes();
             let off1 = (n+1)*self.data_type.num_bytes();
             buf_tr.push(self.data_type.convert_to_f32(&buf_u8[off0 .. off1]));
