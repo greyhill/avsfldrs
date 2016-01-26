@@ -33,14 +33,40 @@ impl From<ParseIntError> for Error {
 pub enum DataType {
     XDRFloat,
     FloatLE,
+    Byte,
 }
 
 impl DataType {
     fn from_str(s: &str) -> Result<DataType, Error> {
         match s {
             "float_le" => Ok(DataType::FloatLE),
-//            "xdr_float" => Ok(DataType::XDRFloat),
+            "xdr_float" => Ok(DataType::XDRFloat),
+            "byte" => Ok(DataType::Byte),
             _ => Err(Error::DataType)
+        }
+    }
+
+    fn num_bytes(self: &Self) -> usize {
+        match *self {
+            DataType::XDRFloat => 4usize,
+            DataType::FloatLE => 4usize,
+            DataType::Byte => 1usize,
+        }
+    }
+
+    fn convert_to_f32(self: &Self, buf: &[u8]) -> f32 {
+        match *self {
+            DataType::XDRFloat => {
+                let b = [buf[3], buf[2], buf[1], buf[0]];
+                unsafe { mem::transmute(b) }
+            },
+            DataType::FloatLE => {
+                let b = [buf[0], buf[1], buf[2], buf[3]];
+                unsafe { mem::transmute(b) }
+            },
+            DataType::Byte => {
+                buf[0] as f32
+            },
         }
     }
 }
@@ -91,6 +117,21 @@ impl AVSFile {
         Ok(())
     }
 
+    pub fn read_to_f32(self: &mut Self) -> Result<Vec<f32>, Error> {
+        let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
+        let mut buf_u8 = Vec::<u8>::with_capacity(size * self.data_type.num_bytes());
+        let mut buf_tr = Vec::<f32>::with_capacity(size);
+        try!(self.reader.read_to_end(&mut buf_u8));
+
+        for n in 0 .. size {
+            let off0 = n*self.data_type.num_bytes();
+            let off1 = (n+1)*self.data_type.num_bytes();
+            buf_tr.push(self.data_type.convert_to_f32(&buf_u8[off0 .. off1]));
+        }
+
+        Ok(buf_tr)
+    }
+
     pub fn read<T>(self: &mut Self) -> Result<Vec<T>, Error> {
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(mem::size_of::<T>()*size);
@@ -98,7 +139,6 @@ impl AVSFile {
         let buf: Vec<T> = unsafe {
             let ptr = buf_u8.as_mut_ptr();
             let cap = buf_u8.capacity();
-            mem::forget(buf_u8);
             Vec::<T>::from_raw_parts(
                 mem::transmute(ptr),
                 size,
