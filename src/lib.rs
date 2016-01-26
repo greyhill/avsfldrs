@@ -118,7 +118,6 @@ impl AVSFile {
     }
 
     pub fn read_to_f32(self: &mut Self) -> Result<Vec<f32>, Error> {
-        println!("{:?}", self.sizes);
         let size = self.sizes.iter().fold(1 as usize, |l, r| l * *r);
         let mut buf_u8 = Vec::<u8>::with_capacity(size * self.data_type.num_bytes());
         let mut buf_tr = Vec::<f32>::with_capacity(size);
@@ -140,6 +139,7 @@ impl AVSFile {
         let buf: Vec<T> = unsafe {
             let ptr = buf_u8.as_mut_ptr();
             let cap = buf_u8.capacity();
+            mem::forget(buf_u8);
             Vec::<T>::from_raw_parts(
                 mem::transmute(ptr),
                 size,
